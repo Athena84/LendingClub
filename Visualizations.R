@@ -19,6 +19,10 @@ cleaned_accepted <- read.csv("./data/cleaned_accepted.csv", header = TRUE, sep =
 #Clean term durations
 cleaned_accepted$term <- as.integer(as.integer(stri_sub(cleaned_accepted$term,1,3)) / 12)
 
+#Clean dates
+cleaned_accepted$issue_date <- as.Date(paste0(as.character(cleaned_accepted$issue_d), "-01"), "%b-%Y-%d")
+
+
 #Loans per year
 cleaned_accepted$issue_y <- as.integer(stri_sub(cleaned_accepted$issue_d,-4,-1))
 Loans_amnt_Year <- ggplot(data = cleaned_accepted, aes(x = issue_y, y= loan_amnt)) + 
@@ -112,3 +116,67 @@ subset_mature <- filter(cleaned_accepted, (term == 3 & issue_y < 2015) | (term =
 subset_mature$issue_y <- as.integer(stri_sub(subset_mature$issue_d,-4,-1))
 CrossTable(x=subset_mature$term, y=subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
 #Yes, longer term loans have a much higher probability of being charged off
+
+
+#Interest rate analysis
+cleaned_accepted$term <- as.factor(cleaned_accepted$term)
+Rates_term <- ggplot(data = cleaned_accepted, aes(x = term, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates by term", x ="Term (year)", y = "Interest rate (%)")
+Rates_term
+
+Rates_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates by grade", x ="Grade", y = "Interest rate (%)")
+Rates_grade
+
+Rates_subgrade <- ggplot(data = cleaned_accepted, aes(x = sub_grade, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates by subgrade", x ="Subgrade", y = "Interest rate (%)")
+Rates_subgrade
+
+cleaned_accepted$issue_y <- as.factor(stri_sub(cleaned_accepted$issue_d,-4,-1))
+Rates_issuedate_A <- filter(cleaned_accepted, grade == "A") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates A-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_A
+Rates_issuedate_B <- filter(cleaned_accepted, grade == "B") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates B-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_B
+Rates_issuedate_C <- filter(cleaned_accepted, grade == "C") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates C-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_C
+Rates_issuedate_D <- filter(cleaned_accepted, grade == "D") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates D-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_D
+Rates_issuedate_E <- filter(cleaned_accepted, grade == "E") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates E-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_E
+Rates_issuedate_F <- filter(cleaned_accepted, grade == "F") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates F-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_F
+Rates_issuedate_G <- filter(cleaned_accepted, grade == "G") %>%
+  ggplot(data = ., aes(x = issue_y, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates G-grade loans by issue date", x ="Issue date", y = "Interest rate (%)")
+Rates_issuedate_G
+
+cleaned_accepted$term <- as.numeric(as.character(cleaned_accepted$term))
+wilcox.test(int_rate ~ term, data = cleaned_accepted)
+kruskal.test(int_rate ~ grade, data = cleaned_accepted)
+kruskal.test(int_rate ~ sub_grade, data = cleaned_accepted)
+#data not normal and sample size large so mann-whitney-wilcox / Kruskal Wallis test proving distribution of rates on short and long loans significantly different
+
+
+
