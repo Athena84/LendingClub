@@ -14,7 +14,7 @@ rejected <- read.csv("./data/rejected_2007_to_2018Q4.csv", header = TRUE, sep = 
 #apply(accepted, 2, unique)
 #ceiling(colMeans(is.na(accepted)) * 100)
 
-selected_cols <- c("addr_state", "annual_inc", "dti", "emp_length", "fico_range_low", "fico_range_high", "grade", "id", "int_rate", "loan_amnt", "funded_amnt", "purpose", "sub_grade", "term", "issue_d", "loan_status")
+selected_cols <- c("addr_state", "annual_inc", "dti", "emp_length", "fico_range_low", "fico_range_high", "grade", "id", "int_rate", "loan_amnt", "funded_amnt", "purpose", "sub_grade", "term", "issue_d", "loan_status", "settlement_status", "last_pymnt_d")
 cleaned_accepted <- accepted[ , selected_cols]
 
 #Save cleaned data set

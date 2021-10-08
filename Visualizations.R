@@ -52,7 +52,7 @@ CrossTable(x=cleaned_accepted$purpose, y=cleaned_accepted$grade, prop.chisq = TR
 cleaned_accepted$issue_y <- as.factor(stri_sub(cleaned_accepted$issue_d,-4,-1))
 Loans_amnt_YearGrade <- group_by(cleaned_accepted, issue_y, grade) %>%
   summarize(., "total_funded" = sum(loan_amnt)) %>%
-  mutate(., "prop_funded" = total_funded / sum(total_funded)) %>%
+  mutate(., "prop_funded" = total_funded / sum(total_funded)) %>% #works because each sumarize takes off one layer of grouping
   ggplot(data = ., aes(x = grade, y = prop_funded, group = issue_y, colour = issue_y)) +
   geom_line() +
   scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
@@ -109,13 +109,39 @@ kruskal.test(funded_amnt ~ purpose, data = cleaned_accepted)
 #Groups have significantly different distributions
 
 #Loans paid in full
+cleaned_accepted$issue_y <- as.integer(stri_sub(cleaned_accepted$issue_d,-4,-1))
 subset_mature <- filter(cleaned_accepted, (term == 3 & issue_y < 2015) | (term == 5 & issue_y < 2013)) %>%
   filter(., (loan_status == "Fully Paid") | (loan_status == "Charged Off"))
 #Note, filtering out the loans not adhering to the policy makes a strong bias, but information is lacking
 
-subset_mature$issue_y <- as.integer(stri_sub(subset_mature$issue_d,-4,-1))
-CrossTable(x=subset_mature$term, y=subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
+CrossTable(x = subset_mature$term, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
 #Yes, longer term loans have a much higher probability of being charged off
+
+subset_mature$term <- as.factor(subset_mature$term)
+default_term_grade <- group_by(subset_mature, term, grade) %>%
+  summarize(., default_rate = mean(loan_status == "Charged Off")) %>%
+  ggplot(data = ., aes(x = grade, y = default_rate, group = term, color = term)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  labs(title="Default rate of loans by term and grade", x ="Grade", y = "Default rate")
+default_term_grade
+
+default_term_subgrade <- group_by(subset_mature, term, sub_grade) %>%
+  summarize(., default_rate = mean(loan_status == "Charged Off")) %>%
+  ggplot(data = ., aes(x = sub_grade, y = default_rate, group = term, color = term)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  labs(title="Default rate of loans by term and subgrade", x ="Subgrade", y = "Default rate")
+default_term_subgrade
+
+subset_short_mature <- filter(subset_mature, term == 3)
+CrossTable(x = subset_short_mature$grade, y = subset_short_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
+subset_long_mature <- filter(subset_mature, term == 5)
+CrossTable(x = subset_long_mature$grade, y = subset_long_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
+
+CrossTable(x = subset_mature$grade, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
+CrossTable(x = subset_mature$sub_grade, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
+#In general and for only short or long loans there is highly significant relation between grade or subgrade and default rate
 
 
 #Interest rate analysis
@@ -178,5 +204,28 @@ kruskal.test(int_rate ~ grade, data = cleaned_accepted)
 kruskal.test(int_rate ~ sub_grade, data = cleaned_accepted)
 #data not normal and sample size large so mann-whitney-wilcox / Kruskal Wallis test proving distribution of rates on short and long loans significantly different
 
+#Settlement analysis
+cleaned_accepted$settlement <- as.factor(ifelse(nzchar(as.character(cleaned_accepted$settlement_status)) == 0, 0, 1))
+
+rate_settlement_grade <- group_by(cleaned_accepted, settlement, grade) %>%
+  summarize(., av_int_rate = mean(int_rate)) %>%
+  ggplot(data = ., aes(x = grade, y = av_int_rate, group = settlement, color = settlement)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1)) +
+  labs(title="Average interest rate of settled and unsettled loands by grade", x ="Grade", y = "Interest rate")
+rate_settlement_grade
+
+rate_settlement_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate, dodge = settlement)) +
+  geom_boxplot() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1)) +
+  labs(title="Average interest rate of settled and unsettled loands by grade", x ="Grade", y = "Interest rate")
+rate_settlement_grade
+
+gradeA <- filter(cleaned_accepted, grade == "A")
+wilcox.test(gradeA$int_rate ~ gradeA$settlement)
+gradeE <- filter(cleaned_accepted, grade == "E")
+wilcox.test(gradeE$int_rate ~ gradeE$settlement)
+gradeG <- filter(cleaned_accepted, grade == "G")
+wilcox.test(gradeG$int_rate ~ gradeG$settlement)
 
 
