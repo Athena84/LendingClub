@@ -21,6 +21,7 @@ cleaned_accepted$term <- as.integer(as.integer(stri_sub(cleaned_accepted$term,1,
 
 #Clean dates
 cleaned_accepted$issue_date <- as.Date(paste0(as.character(cleaned_accepted$issue_d), "-01"), "%b-%Y-%d")
+cleaned_accepted$last_pymnt_date <- as.Date(paste0(as.character(cleaned_accepted$last_pymnt_d), "-01"), "%b-%Y-%d")
 
 
 #Loans per year
@@ -227,5 +228,44 @@ gradeE <- filter(cleaned_accepted, grade == "E")
 wilcox.test(gradeE$int_rate ~ gradeE$settlement)
 gradeG <- filter(cleaned_accepted, grade == "G")
 wilcox.test(gradeG$int_rate ~ gradeG$settlement)
+#For most grades there is a significant difference, not for G
+
+
+#Duration
+subset_mature$duration <- subset_mature$last_pymnt_date - subset_mature$issue_date
+subset_mature$part_term <- as.numeric(subset_mature$duration / (365 * subset_mature$term))
+
+Partial_Prepaid <- ggplot(data = subset_mature, aes(x = part_term, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Partial durations mature loans by grade", x ="Partial duration", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Partial_Prepaid
+
+Partial_Prepaid <- filter(subset_mature, loan_status == "Fully Paid") %>%
+  ggplot(data = ., aes(x = part_term, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Partial durations fully paid loans by grade", x ="Partial duration", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Partial_Prepaid
+
+Partial_Prepaid <- filter(subset_mature, loan_status == "Charged Off") %>%
+  ggplot(data = ., aes(x = part_term, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Partial durations defaulted loans by grade", x ="Partial duration", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Partial_Prepaid
+
+filter(subset_mature, loan_status == "Fully Paid") %>%
+  kruskal.test(part_term ~ grade, data = .) #significant deviation in distribution
+filter(subset_mature, loan_status == "Charged Off") %>%
+  kruskal.test(part_term ~ grade, data = .) #significant deviation in distribution
+#No real difference by term
+
 
 
