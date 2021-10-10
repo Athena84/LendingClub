@@ -267,5 +267,39 @@ filter(subset_mature, loan_status == "Charged Off") %>%
   kruskal.test(part_term ~ grade, data = .) #significant deviation in distribution
 #No real difference by term
 
+subset_mature$profit <- (subset_mature$total_pymnt - subset_mature$funded_amnt) / subset_mature$funded_amnt
+subset_mature$profit_ann <- subset_mature$profit  / (as.numeric(subset_mature$duration) / 365)
 
+Profit_distributions_paidoff <- filter(subset_mature, loan_status == "Fully Paid") %>%
+  ggplot(data = ., aes(x = profit_ann, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Distributions of annual profit paid off loans by grade", x ="Annual profit", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Profit_distributions_paidoff
 
+Profit_distributions_default <- filter(subset_mature, loan_status == "Charged Off") %>%
+  ggplot(data = ., aes(x = profit, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Distributions of total return defaulted loans by grade", x ="Profit", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Profit_distributions_default
+
+Profit_distributions <- ggplot(data = subset_mature, aes(x = profit, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Distributions of total profit all loans by grade", x ="Profit", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Profit_distributions
+
+Profit_distributions <- ggplot(data = subset_mature, aes(x = profit_ann, group = grade, color = grade)) +
+  geom_density() +
+  labs(title="Distributions of annual profit all loans by grade", x ="Profit", y = "Frequency") +
+  scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2), limits = c(-0.2, 0.3)) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+Profit_distributions
