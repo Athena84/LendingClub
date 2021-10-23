@@ -4,6 +4,8 @@ library(scales)
 library(stringi)
 library(gmodels)
 library(RColorBrewer)
+library(survminer)
+library(survival)
 
 #Setting chart defaults
 old_theme <- theme_set(theme_linedraw() +
@@ -113,7 +115,10 @@ kruskal.test(funded_amnt ~ purpose, data = cleaned_accepted)
 cleaned_accepted$issue_y <- as.integer(stri_sub(cleaned_accepted$issue_d,-4,-1))
 subset_mature <- filter(cleaned_accepted, (term == 3 & issue_y < 2015) | (term == 5 & issue_y < 2013)) %>%
   filter(., (loan_status == "Fully Paid") | (loan_status == "Charged Off"))
+subset_mature$loan_status <- droplevels(subset_mature$loan_status)
+subset_mature$loan_status[1]
 #Note, filtering out the loans not adhering to the policy makes a strong bias, but information is lacking
+#Note, in loans with this term and age there were no other statusses present, so there is no issue with long overdue loans still running
 
 CrossTable(x = subset_mature$term, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
 #Yes, longer term loans have a much higher probability of being charged off
@@ -142,7 +147,7 @@ CrossTable(x = subset_long_mature$grade, y = subset_long_mature$loan_status, pro
 
 CrossTable(x = subset_mature$grade, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
 CrossTable(x = subset_mature$sub_grade, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
-#In general and for only short or long loans there is highly significant relation between grade or subgrade and default rate
+#In general and for short or long loans separately, there is highly significant relation between grade or subgrade and default rate
 
 
 #Interest rate analysis
@@ -219,7 +224,7 @@ rate_settlement_grade
 rate_settlement_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate, dodge = settlement)) +
   geom_boxplot() +
   scale_y_continuous(labels = label_number(suffix = "%", scale = 1)) +
-  labs(title="Average interest rate of settled and unsettled loands by grade", x ="Grade", y = "Interest rate")
+  labs(title="Interest rate distribution of settled and unsettled loands by grade", x ="Grade", y = "Interest rate")
 rate_settlement_grade
 
 gradeA <- filter(cleaned_accepted, grade == "A")
@@ -232,8 +237,9 @@ wilcox.test(gradeG$int_rate ~ gradeG$settlement)
 
 
 #Duration
-subset_mature$duration <- subset_mature$last_pymnt_date - subset_mature$issue_date
-subset_mature$part_term <- as.numeric(subset_mature$duration / (365 * subset_mature$term))
+#Needs to be analysed on only loans that could have completely paid off. If filtering on paid off and charged off statuses, the charged off would have been biased to overrepresentation 
+subset_mature$duration <- as.numeric(subset_mature$last_pymnt_date - subset_mature$issue_date) / 365
+subset_mature$part_term <- subset_mature$duration / subset_mature$term
 
 Partial_Prepaid <- ggplot(data = subset_mature, aes(x = part_term, group = grade, color = grade)) +
   geom_density() +
@@ -267,10 +273,21 @@ filter(subset_mature, loan_status == "Charged Off") %>%
   kruskal.test(part_term ~ grade, data = .) #significant deviation in distribution
 #No real difference by term
 
-subset_mature$profit <- (subset_mature$total_pymnt - subset_mature$funded_amnt) / subset_mature$funded_amnt
-subset_mature$profit_ann <- subset_mature$profit  / (as.numeric(subset_mature$duration) / 365)
 
-Profit_distributions_paidoff <- filter(subset_mature, loan_status == "Fully Paid") %>%
+#Profit analysis
+#Rounding all durations shorter than 1y up to 1y to avoid exploding return rates with extremely short durations
+#Note: the paid off loans and charged off loans can be filtered from the total data set for profit analysis, however the combination of the two should only be filtered from the mature subset as it would otherwise bias toward charged off loans
+cleaned_accepted$duration <- as.numeric(cleaned_accepted$last_pymnt_date - cleaned_accepted$issue_date) / 365
+cleaned_accepted$duration <- ifelse(cleaned_accepted$duration > 1, cleaned_accepted$duration, 1)
+cleaned_accepted$profit <- (cleaned_accepted$total_pymnt - cleaned_accepted$funded_amnt) / cleaned_accepted$funded_amnt
+cleaned_accepted$profit_ann <- cleaned_accepted$profit  / cleaned_accepted$duration
+
+subset_mature$duration <- as.numeric(subset_mature$last_pymnt_date - subset_mature$issue_date) / 365
+subset_mature$duration <- ifelse(subset_mature$duration > 1, subset_mature$duration, 1)
+subset_mature$profit <- (subset_mature$total_pymnt - subset_mature$funded_amnt) / subset_mature$funded_amnt
+subset_mature$profit_ann <- subset_mature$profit  / subset_mature$duration
+
+Profit_distributions_paidoff <- filter(cleaned_accepted, loan_status == "Fully Paid") %>%
   ggplot(data = ., aes(x = profit_ann, group = grade, color = grade)) +
   geom_density() +
   labs(title="Distributions of annual profit paid off loans by grade", x ="Annual profit", y = "Frequency") +
@@ -279,7 +296,7 @@ Profit_distributions_paidoff <- filter(subset_mature, loan_status == "Fully Paid
         axis.ticks.y = element_blank())
 Profit_distributions_paidoff
 
-Profit_distributions_default <- filter(subset_mature, loan_status == "Charged Off") %>%
+Profit_distributions_default <- filter(cleaned_accepted, loan_status == "Charged Off") %>%
   ggplot(data = ., aes(x = profit, group = grade, color = grade)) +
   geom_density() +
   labs(title="Distributions of total return defaulted loans by grade", x ="Profit", y = "Frequency") +
@@ -288,18 +305,68 @@ Profit_distributions_default <- filter(subset_mature, loan_status == "Charged Of
         axis.ticks.y = element_blank())
 Profit_distributions_default
 
-Profit_distributions <- ggplot(data = subset_mature, aes(x = profit, group = grade, color = grade)) +
+Profit_distributions_mix <- ggplot(data = subset_mature, aes(x = profit, group = grade, color = grade)) +
   geom_density() +
   labs(title="Distributions of total profit all loans by grade", x ="Profit", y = "Frequency") +
   scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
-Profit_distributions
+Profit_distributions_mix
 
-Profit_distributions <- ggplot(data = subset_mature, aes(x = profit_ann, group = grade, color = grade)) +
+Profit_distributions_mix_ann <- ggplot(data = subset_mature, aes(x = profit_ann, group = grade, color = grade)) +
   geom_density() +
   labs(title="Distributions of annual profit all loans by grade", x ="Profit", y = "Frequency") +
   scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2), limits = c(-0.2, 0.3)) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
-Profit_distributions
+Profit_distributions_mix_ann
+
+cleaned_accepted$settlement <- as.factor(ifelse(nzchar(as.character(cleaned_accepted$settlement_status)) == 0, 0, 1))
+subset_mature$settlement <- as.factor(ifelse(nzchar(as.character(subset_mature$settlement_status)) == 0, 0, 1))
+
+profit_settlement_grade <- group_by(subset_mature, settlement, grade) %>%
+  summarize(., av_profit = mean(profit)) %>%
+  ggplot(data = ., aes(x = grade, y = av_profit, group = settlement, color = settlement)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2), limits = c(-0.2, 0.3)) +
+  labs(title="Average profit (un)settled loans by grade", x ="Grade", y = "Average total profit")
+profit_settlement_grade
+
+profit_settlement_grade <- ggplot(data = subset_mature, aes(x = grade, y = profit, dodge = settlement, color = settlement)) +
+  geom_boxplot() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2), limits = c(-0.2, 0.3)) +
+  labs(title="Profit distribution (non-)settled loans by grade", x ="Grade", y = "Total profit")
+profit_settlement_grade
+
+profit_grade_purpose <- group_by(subset_mature, purpose, grade) %>%
+  summarize(., av_profit = mean(profit)) %>%
+  ggplot(data = ., aes(x = grade, y = av_profit, group = purpose, color = purpose)) +
+  geom_point() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2), limits = c(-0.2, 0.3)) +
+  labs(title="Average profit loans by purpose and grade", x ="Grade", y = "Average total profit")
+profit_grade_purpose
+
+
+#Survival analysis
+cleaned_accepted$part_term <- cleaned_accepted$duration / cleaned_accepted$term
+subset_mature$part_term <- subset_mature$duration / subset_mature$term
+
+paid_5 <- filter(cleaned_accepted, loan_status == "Fully Paid" & term == 5)
+paid_3 <- filter(cleaned_accepted, loan_status == "Fully Paid" & term == 3)
+paid <- filter(cleaned_accepted, loan_status == "Fully Paid")
+fit_paid_5 <- survfit(Surv(part_term) ~ grade, data = paid_5)
+fit_paid_3 <- survfit(Surv(part_term) ~ grade, data = paid_3)
+fit_paid <- survfit(Surv(part_term) ~ grade, data = paid)
+ggsurvplot(fit_paid, xlim = c(0,1.2)) +
+  labs(title="Survival plot fully paid loans by grade", x ="Multiple of term", y = "Survival rate", fill = "Grade")
+
+charged_off <- filter(cleaned_accepted, loan_status == "Charged Off")
+fit_charged_off <- survfit(Surv(part_term) ~ grade, data = charged_off)
+ggsurvplot(fit_charged_off, xlim = c(0, 1.2)) +
+  labs(title="Survival plot Charged off loans by grade", x ="Multiple of term", y = "Survival rate", fill = "Grade")
+
+fit_mature <- survfit(Surv(part_term, loan_status, type = "mstate") ~ grade, data = subset_mature)
+ggcompetingrisks(fit_mature,  xlim = c(0, 1.2)) +
+  labs(title="Survival plot mature loans by grade", x ="Multiple of term", y = "Survival rate")
+
+
