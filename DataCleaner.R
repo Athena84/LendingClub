@@ -15,10 +15,8 @@ cleaned_accepted <- accepted[ , selected_cols] %>%
 write.csv(cleaned_accepted, "./data/cleaned_accepted.csv", row.names = FALSE)
 
 #Save combined cleaned version of rejected & accepted loans for analysis
-rejected <- rename(rejected,
-                   Risk.Score = Risk_Score
-                   )
-selected_rej_cols <- c("Amount.Requested", "Application.Date",  "Debt.To.Income.Ratio", "Employment.Length", "Risk.Score", "State") 
+#risk score has 67% missing values, no point in using
+selected_rej_cols <- c("Amount.Requested", "Application.Date",  "Debt.To.Income.Ratio", "Employment.Length", "State") 
 rejected <- rejected[ , selected_rej_cols]
 rejected$Application.Date <- year(as.Date(rejected$Application.Date))
 rejected$Status <- "rejected"
@@ -32,13 +30,14 @@ rejected$Employment.Length <- as.numeric(rejected$Employment.Length)
 rejected$Employment.Length <- ifelse(is.na(rejected$Employment.Length), 0, rejected$Employment.Length)
 
 accepted <- rename(accepted,
-                   Amount.Requested = funded_amnt,
+                   Amount.Requested = loan_amnt,
                    Employment.Length = emp_length,
                    State = addr_state,
                    )
 accepted$Application.Date <- as.integer(stri_sub(accepted$issue_d, -4, -1))
-accepted$Risk.Score = (accepted$fico_range_high + accepted$fico_range_low) / 2
+#accepted$Risk.Score = (accepted$fico_range_high + accepted$fico_range_low) / 2
 accepted$Debt.To.Income.Ratio <- ifelse(accepted$application_type == "Individual", accepted$dti, accepted$dti_joint)
+accepted <- filter(accepted, Debt.To.Income.Ratio > 0)
 accepted <- accepted[ , selected_rej_cols]
 accepted$Status <- "accepted"
 
@@ -49,8 +48,9 @@ accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length,
 accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length, "< 1", "0")
 accepted$Employment.Length <- as.numeric(accepted$Employment.Length)
 accepted$Employment.Length <- ifelse(is.na(accepted$Employment.Length), 0, accepted$Employment.Length)
+accepted <- filter(accepted, Amount.Requested >0)
 
 write.csv(rbind(accepted, rejected), "./data/cleaned_applications.csv", row.names = FALSE)
 
-#ceiling(colMeans(is.na(accepted)) * 100)
+ceiling(colMeans(is.na(accepted)) * 100)
 
