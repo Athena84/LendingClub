@@ -8,13 +8,6 @@ library(lubridate)
 accepted <- read.csv("./data/accepted_2007_to_2018Q4.csv", header = TRUE, sep = ",", stringsAsFactors = TRUE)
 rejected <- read.csv("./data/rejected_2007_to_2018Q4.csv", header = TRUE, sep = ",", stringsAsFactors = TRUE)
 
-#Testing overview
-#sort(colnames(accepted))
-#summary(accepted)
-#summary(rejected)
-#apply(accepted, 2, unique)
-#ceiling(colMeans(is.na(accepted)) * 100)
-
 #Save cleaned data set for analysis on accepted loans
 selected_cols <- c("addr_state", "annual_inc", "dti", "emp_length", "fico_range_low", "fico_range_high", "grade", "id", "int_rate", "loan_amnt", "funded_amnt", "purpose", "sub_grade", "term", "issue_d", "loan_status", "settlement_status", "last_pymnt_d", "total_pymnt")
 cleaned_accepted <- accepted[ , selected_cols] %>%
@@ -30,6 +23,14 @@ rejected <- rejected[ , selected_rej_cols]
 rejected$Application.Date <- year(as.Date(rejected$Application.Date))
 rejected$Status <- "rejected"
 
+rejected$Employment.Length <- as.character(rejected$Employment.Length)
+rejected$Employment.Length <- stri_replace_all_fixed(rejected$Employment.Length, " years", "")
+rejected$Employment.Length <- stri_replace_all_fixed(rejected$Employment.Length, " year", "")
+rejected$Employment.Length <- stri_replace_all_fixed(rejected$Employment.Length, "+", "")
+rejected$Employment.Length <- stri_replace_all_fixed(rejected$Employment.Length, "< 1", "0")
+rejected$Employment.Length <- as.numeric(rejected$Employment.Length)
+rejected$Employment.Length <- ifelse(is.na(rejected$Employment.Length), 0, rejected$Employment.Length)
+
 accepted <- rename(accepted,
                    Amount.Requested = funded_amnt,
                    Employment.Length = emp_length,
@@ -41,4 +42,15 @@ accepted$Debt.To.Income.Ratio <- ifelse(accepted$application_type == "Individual
 accepted <- accepted[ , selected_rej_cols]
 accepted$Status <- "accepted"
 
+accepted$Employment.Length <- as.character(accepted$Employment.Length)
+accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length, " years", "")
+accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length, " year", "")
+accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length, "+", "")
+accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length, "< 1", "0")
+accepted$Employment.Length <- as.numeric(accepted$Employment.Length)
+accepted$Employment.Length <- ifelse(is.na(accepted$Employment.Length), 0, accepted$Employment.Length)
+
 write.csv(rbind(accepted, rejected), "./data/cleaned_applications.csv", row.names = FALSE)
+
+#ceiling(colMeans(is.na(accepted)) * 100)
+

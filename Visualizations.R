@@ -16,7 +16,6 @@ old_theme <- theme_set(theme_linedraw() +
 
 #Read the data
 cleaned_accepted <- read.csv("./data/cleaned_accepted.csv", header = TRUE, sep = ",", stringsAsFactors = TRUE)
-#colnames(cleaned_accepted)
 
 #Clean term durations
 cleaned_accepted$term <- as.integer(as.integer(stri_sub(cleaned_accepted$term,1,3)) / 12)
