@@ -28,6 +28,9 @@ rejected$Employment.Length <- stri_replace_all_fixed(rejected$Employment.Length,
 rejected$Employment.Length <- stri_replace_all_fixed(rejected$Employment.Length, "< 1", "0")
 rejected$Employment.Length <- as.numeric(rejected$Employment.Length)
 rejected$Employment.Length <- ifelse(is.na(rejected$Employment.Length), 0, rejected$Employment.Length)
+rejected$Debt.To.Income.Ratio <- as.numeric(rejected$Debt.To.Income.Ratio)
+rejected$State <- as.character(rejected$State)
+rejected$Status <- as.character(rejected$Status)
 
 accepted <- rename(accepted,
                    Amount.Requested = loan_amnt,
@@ -49,8 +52,11 @@ accepted$Employment.Length <- stri_replace_all_fixed(accepted$Employment.Length,
 accepted$Employment.Length <- as.numeric(accepted$Employment.Length)
 accepted$Employment.Length <- ifelse(is.na(accepted$Employment.Length), 0, accepted$Employment.Length)
 accepted <- filter(accepted, Amount.Requested >0)
+accepted$State <- as.character(accepted$State)
+accepted$Status <- as.character(accepted$Status)
 
 write.csv(rbind(accepted, rejected), "./data/cleaned_applications.csv", row.names = FALSE)
 
+#Test missing values
 ceiling(colMeans(is.na(accepted)) * 100)
-
+ceiling(colMeans(is.na(rejected)) * 100)

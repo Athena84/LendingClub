@@ -20,3 +20,5 @@ LendingClub.Rproj
 .ipynb_checkpoints
 
 .RDataTmp
+tree.dot
+tree.png
