@@ -9,9 +9,11 @@ library(survival)
 
 #Setting chart defaults
 old_theme <- theme_set(theme_linedraw() +
-                         theme(plot.title = element_text(size = 16, face = "bold")) +
-                         theme(axis.title = element_text(size = 14,)) +
-                         theme(axis.text = element_text(size = 14,)) 
+                         theme(plot.title = element_text(size = 20, face = "bold")) +
+                         theme(axis.title = element_text(size = 18, face = "bold")) +
+                         theme(legend.title = element_text(size = 18, face = "bold")) +
+                         theme(axis.text = element_text(size = 18)) +
+                         theme(legend.text = element_text(size = 18))
 ) 
 
 #Read the data
@@ -40,7 +42,8 @@ Loans_num_Year <- ggplot(data = cleaned_accepted, aes(x = issue_y)) +
 Loans_num_Year
 
 #Purposes
-Loans_amnt_PurpGrade <- group_by(cleaned_accepted, purpose, grade) %>%
+Loans_amnt_PurpGrade <- filter(cleaned_accepted, (!is.na(purpose) & purpose != " ")) %>%
+  group_by(., purpose, grade) %>%
   summarize(., "total_funded" = sum(loan_amnt)) %>%
   mutate(., "prop_funded" = total_funded / sum(total_funded)) %>%
   ggplot(data = ., aes(x = grade, y = prop_funded, group = purpose, colour = purpose)) +
@@ -115,14 +118,30 @@ cleaned_accepted$issue_y <- as.integer(stri_sub(cleaned_accepted$issue_d,-4,-1))
 subset_mature <- filter(cleaned_accepted, (term == 3 & issue_y < 2015) | (term == 5 & issue_y < 2013)) %>%
   filter(., (loan_status == "Fully Paid") | (loan_status == "Charged Off"))
 subset_mature$loan_status <- droplevels(subset_mature$loan_status)
-subset_mature$loan_status[1]
+subset_mature$term <- as.factor(subset_mature$term)
 #Note, filtering out the loans not adhering to the policy makes a strong bias, but information is lacking
 #Note, in loans with this term and age there were no other statusses present, so there is no issue with long overdue loans still running
 
 CrossTable(x = subset_mature$term, y = subset_mature$loan_status, prop.chisq = TRUE, prop.r = FALSE, prop.c = FALSE, prop.t = FALSE, chisq = TRUE)
 #Yes, longer term loans have a much higher probability of being charged off
 
-subset_mature$term <- as.factor(subset_mature$term)
+default_grade <- group_by(subset_mature, grade) %>%
+  summarize(., default_rate = mean(loan_status == "Charged Off")) %>%
+  ggplot(data = ., aes(x = grade, y = default_rate, group = 1)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  labs(title="Default rate of loans by grade", x ="Grade", y = "Default rate")
+default_grade
+
+default_subgrade <- group_by(subset_mature, sub_grade) %>%
+  summarize(., default_rate = mean(loan_status == "Charged Off")) %>%
+  ggplot(data = ., aes(x = sub_grade, y = default_rate, group = 1)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
+  labs(title="Default rate of loans by subgrade", x ="Grade", y = "Default rate")
+default_subgrade
+
+
 default_term_grade <- group_by(subset_mature, term, grade) %>%
   summarize(., default_rate = mean(loan_status == "Charged Off")) %>%
   ggplot(data = ., aes(x = grade, y = default_rate, group = term, color = term)) +
@@ -151,12 +170,19 @@ CrossTable(x = subset_mature$sub_grade, y = subset_mature$loan_status, prop.chis
 
 #Interest rate analysis
 cleaned_accepted$term <- as.factor(cleaned_accepted$term)
+cleaned_accepted <- filter(cleaned_accepted, term == 3 | term == 5)
+
 Rates_term <- ggplot(data = cleaned_accepted, aes(x = term, y = int_rate)) +
   geom_boxplot() +
   labs(title="Distribution of interest rates by term", x ="Term (year)", y = "Interest rate (%)")
 Rates_term
 
 Rates_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate)) +
+  geom_boxplot() +
+  labs(title="Distribution of interest rates by grade", x ="Grade", y = "Interest rate (%)")
+Rates_grade
+
+Rates_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate, color = term)) +
   geom_boxplot() +
   labs(title="Distribution of interest rates by grade", x ="Grade", y = "Interest rate (%)")
 Rates_grade
@@ -220,7 +246,7 @@ rate_settlement_grade <- group_by(cleaned_accepted, settlement, grade) %>%
   labs(title="Average interest rate of settled and unsettled loands by grade", x ="Grade", y = "Interest rate")
 rate_settlement_grade
 
-rate_settlement_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate, dodge = settlement)) +
+rate_settlement_grade <- ggplot(data = cleaned_accepted, aes(x = grade, y = int_rate, dodge = settlement, color = settlement)) +
   geom_boxplot() +
   scale_y_continuous(labels = label_number(suffix = "%", scale = 1)) +
   labs(title="Interest rate distribution of settled and unsettled loands by grade", x ="Grade", y = "Interest rate")
@@ -238,6 +264,7 @@ wilcox.test(gradeG$int_rate ~ gradeG$settlement)
 #Duration
 #Needs to be analysed on only loans that could have completely paid off. If filtering on paid off and charged off statuses, the charged off would have been biased to overrepresentation 
 subset_mature$duration <- as.numeric(subset_mature$last_pymnt_date - subset_mature$issue_date) / 365
+subset_mature$term <- as.numeric(levels(subset_mature$term)[subset_mature$term])
 subset_mature$part_term <- subset_mature$duration / subset_mature$term
 
 Partial_Prepaid <- ggplot(data = subset_mature, aes(x = part_term, group = grade, color = grade)) +
@@ -306,7 +333,7 @@ Profit_distributions_default
 
 Profit_distributions_mix <- ggplot(data = subset_mature, aes(x = profit, group = grade, color = grade)) +
   geom_density() +
-  labs(title="Distributions of total profit all loans by grade", x ="Profit", y = "Frequency") +
+  labs(title="Distributions of total return mature loans by grade", x ="Return", y = "Frequency") +
   scale_x_continuous(labels = label_number(suffix = "%", scale = 1e2)) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
